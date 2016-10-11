@@ -29,6 +29,7 @@ class WebsocketServer
         struct ev_loop *pMainLoop = EV_DEFAULT;
         int intListenPort;
         int intListenFd;
+        ev_io *listenWatcher;
         connectionMap mapConnection;
     public:
         static WebsocketServer *getInstance();

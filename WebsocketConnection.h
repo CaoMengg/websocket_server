@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <ev.h>
 
@@ -12,7 +13,6 @@ enum enumConnectionStatus
     csAccepted,
     csConnected,
     csClosing,
-    csClosed,
 };
 
 class WebsocketConnection
@@ -31,18 +31,42 @@ class WebsocketConnection
             outBufLen = 0;
             outBufSentLen = 0;
         }
+        ~WebsocketConnection() {
+            if( readWatcher && pLoop ) {
+                ev_io_stop( pLoop, readWatcher );
+                delete readWatcher;
+            }
+            if( writeWatcher && pLoop ) {
+                ev_io_stop( pLoop, writeWatcher );
+                delete writeWatcher;
+            }
+
+            if( intFd ) {
+                close( intFd );
+            }
+
+            if( inBuf ) {
+                delete[] inBuf;
+            }
+            if( outBuf ) {
+                delete[] outBuf;
+            }
+
+            printf("delete connection, fd=%d\n", intFd);
+        }
+        struct ev_loop *pLoop = NULL;
         int intFd;
         enumConnectionStatus status;
-        ev_io *readWatcher;
-        ev_io *writeWatcher;
+        ev_io *readWatcher = NULL;
+        ev_io *writeWatcher = NULL;
 
-        char *inBuf;
+        char *inBuf = NULL;
         char *inBufPos;
         int inBufSize;
         int inBufLen;
         int inBufExpectLen;
 
-        char *outBuf;
+        char *outBuf = NULL;
         char *outBufPos;
         int outBufSize;
         int outBufLen;

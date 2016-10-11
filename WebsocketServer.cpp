@@ -77,9 +77,7 @@ void WebsocketServer::ackMessage( WebsocketConnection *pConnection )
         pConnection->outBufPos = pConnection->outBuf;
 
         if( pConnection->status == csClosing ) {
-            printf( "close connection, fd=%d\n", pConnection->intFd );
-            pConnection->status = csClosed;
-            close( pConnection->intFd );
+            delete pConnection;
             return;
         }
 
@@ -159,10 +157,15 @@ void WebsocketServer::recvHandshake( WebsocketConnection *pConnection )
             ev_io_stop(pMainLoop, pConnection->readWatcher);
             parseHandshake( pConnection );
         }
-    } else {
-        ev_io_stop(pMainLoop, pConnection->readWatcher);
-        close( pConnection->intFd );
+    } else if( n == 0 ) {
+        delete pConnection;
         return;
+    } else {
+        if( errno==EAGAIN || errno==EWOULDBLOCK ) {
+        } else {
+            delete pConnection;
+            return;
+        }
     }
 }
 
@@ -221,7 +224,7 @@ void WebsocketServer::recvMessage( WebsocketConnection *pConnection )
         }
     } else {
         ev_io_stop(pMainLoop, pConnection->readWatcher);
-        close( pConnection->intFd );
+        delete pConnection;
         return;
     }
 }
@@ -264,6 +267,7 @@ void WebsocketServer::acceptCB()
     printf("accept fd=%d\n", acceptFd);
 
     WebsocketConnection* pConnection = new WebsocketConnection();
+    pConnection->pLoop = pMainLoop;
     pConnection->intFd = acceptFd;
     pConnection->status = csAccepted;
 
@@ -308,14 +312,14 @@ void WebsocketServer::run()
         return;
     }
 
-    intRet = listen( intListenFd, 16 );
+    intRet = listen( intListenFd, 255 );
     if( intRet != 0 ) {
         printf("listen fail\n");
         return;
     }
     printf("listen succ port=%d fd=%d\n", intListenPort, intListenFd);
 
-    ev_io* listenWatcher = new ev_io();
+    listenWatcher = new ev_io();
     ev_io_init( listenWatcher, acceptCallback, intListenFd, EV_READ );
     ev_io_start( pMainLoop, listenWatcher );
     ev_run( pMainLoop, 0 );
