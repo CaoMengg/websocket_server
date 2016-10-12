@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 
 #include <ev.h>
 
@@ -19,13 +20,12 @@ class WebsocketConnection
 {
     public:
         WebsocketConnection(): intFd( 0 ), status( csInit ), readWatcher( NULL ), writeWatcher( NULL ) {
-            inBufSize = 1024;
+            inBufSize = 200;
             inBuf = new char[inBufSize];
-            inBufPos = inBuf;
             inBufLen = 0;
             inBufExpectLen = 0;
 
-            outBufSize = 1024;
+            outBufSize = 200;
             outBuf = new char[outBufSize];
             outBufPos = outBuf;
             outBufLen = 0;
@@ -61,7 +61,6 @@ class WebsocketConnection
         ev_io *writeWatcher = NULL;
 
         char *inBuf = NULL;
-        char *inBufPos;
         int inBufSize;
         int inBufLen;
         int inBufExpectLen;
@@ -71,6 +70,8 @@ class WebsocketConnection
         int outBufSize;
         int outBufLen;
         int outBufSentLen;
+
+        void enlargeInBuf();
 };
 
 #endif

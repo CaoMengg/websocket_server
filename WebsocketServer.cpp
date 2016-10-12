@@ -44,7 +44,6 @@ void WebsocketServer::ackHandshake( WebsocketConnection *pConnection )
         printf("handshake succ, fd=%d\n", pConnection->intFd);
         pConnection->inBufLen = 0;
         pConnection->inBufExpectLen = 0;
-        pConnection->inBufPos = pConnection->inBuf;
 
         pConnection->outBufLen = 0;
         pConnection->outBufSentLen = 0;
@@ -67,20 +66,20 @@ void WebsocketServer::ackMessage( WebsocketConnection *pConnection )
     }
 
     if( pConnection->outBufSentLen >= pConnection->outBufLen ) {
-        printf("ack message succ, fd=%d\n", pConnection->intFd);
         pConnection->inBufLen = 0;
         pConnection->inBufExpectLen = 0;
-        pConnection->inBufPos = pConnection->inBuf;
 
         pConnection->outBufLen = 0;
         pConnection->outBufSentLen = 0;
         pConnection->outBufPos = pConnection->outBuf;
 
         if( pConnection->status == csClosing ) {
+            printf("ack close succ, fd=%d\n", pConnection->intFd);
             delete pConnection;
             return;
         }
 
+        printf("ack message succ, fd=%d\n", pConnection->intFd);
         if( pConnection->status == csAccepted ) {
             pConnection->status = csConnected;
         }
@@ -145,15 +144,13 @@ void WebsocketServer::parseHandshake( WebsocketConnection *pConnection )
 
 void WebsocketServer::recvHandshake( WebsocketConnection *pConnection )
 {
-    int n = recv( pConnection->intFd, pConnection->inBufPos, pConnection->inBufSize-pConnection->inBufLen, 0 );
+    int n = recv( pConnection->intFd, pConnection->inBuf+pConnection->inBufLen, pConnection->inBufSize-pConnection->inBufLen, 0 );
     if( n > 0 ) {
-        pConnection->inBufPos += n;
         pConnection->inBufLen += n;
 
         if( pConnection->inBuf[pConnection->inBufLen-4]=='\r' && pConnection->inBuf[pConnection->inBufLen-3]=='\n' &&
                 pConnection->inBuf[pConnection->inBufLen-2]=='\r' && pConnection->inBuf[pConnection->inBufLen-1]=='\n'
           ) {
-            //printf("recv handshake, fd=%d\n", pConnection->intFd);
             ev_io_stop(pMainLoop, pConnection->readWatcher);
             parseHandshake( pConnection );
         }
@@ -197,24 +194,36 @@ void WebsocketServer::closeConnection( WebsocketConnection *pConnection )
 
 void WebsocketServer::recvMessage( WebsocketConnection *pConnection )
 {
-    int n = recv( pConnection->intFd, pConnection->inBufPos, pConnection->inBufSize-pConnection->inBufLen, 0 );
+    int n = recv( pConnection->intFd, pConnection->inBuf+pConnection->inBufLen, pConnection->inBufSize-pConnection->inBufLen, 0 );
+    printf("%d %d\n", pConnection->inBufLen, pConnection->inBufSize);
     if( n > 0 ) {
         if( pConnection->inBufExpectLen == 0 ) {
             if( (pConnection->inBuf[0] & 0x0f) == 0x01 && (pConnection->inBuf[1] & 0x80) == 0x80 )
             {
                 //text
-                pConnection->inBufExpectLen = (pConnection->inBuf[1] & 0x7f) + 6;
+                int intPayloadLen = pConnection->inBuf[1] & 0x7f;
+                if( intPayloadLen == 126 ) {
+                    intPayloadLen = int(pConnection->inBuf[2])*256 + int(pConnection->inBuf[3]);
+                } else if( intPayloadLen == 127 ) {
+                    printf("unsupported payload len, close\n");
+                    ev_io_stop(pMainLoop, pConnection->readWatcher);
+                    closeConnection( pConnection );
+                    return;
+                }
+                pConnection->inBufExpectLen = intPayloadLen + 6;    //first 2 byte and 4 mask byte
+                printf("len=%d\n", pConnection->inBufExpectLen);
             } else if( (pConnection->inBuf[0] & 0x0f) == 0x08 ) {
                 //close
                 ev_io_stop(pMainLoop, pConnection->readWatcher);
                 closeConnection( pConnection );
                 return;
             } else {
-                printf("unsupported message, ignore\n");
+                printf("unsupported message, close\n");
+                ev_io_stop(pMainLoop, pConnection->readWatcher);
+                closeConnection( pConnection );
                 return;
             }
         }
-        pConnection->inBufPos += n;
         pConnection->inBufLen += n;
 
         if( pConnection->inBufLen >= pConnection->inBufExpectLen ) {
@@ -222,10 +231,15 @@ void WebsocketServer::recvMessage( WebsocketConnection *pConnection )
             ev_io_stop(pMainLoop, pConnection->readWatcher);
             parseMessage( pConnection );
         }
-    } else {
-        ev_io_stop(pMainLoop, pConnection->readWatcher);
+    } else if( n == 0 ) {
         delete pConnection;
         return;
+    } else {
+        if( errno==EAGAIN || errno==EWOULDBLOCK ) {
+        } else {
+            delete pConnection;
+            return;
+        }
     }
 }
 
@@ -238,6 +252,10 @@ void WebsocketServer::readCB( int intFd )
         return;
     }
     WebsocketConnection* pConnection = it->second;
+
+    if( pConnection->inBufLen >= pConnection->inBufSize ) {
+        pConnection->enlargeInBuf();
+    }
 
     if( pConnection->status == csAccepted ) {
         recvHandshake( pConnection );
@@ -274,7 +292,7 @@ void WebsocketServer::acceptCB()
     connectionMap::iterator it;
     mapConnection.find( acceptFd );
     if( it != mapConnection.end() ) {
-        //close connect
+        //TODO close connect
     }
     mapConnection[ acceptFd ] = pConnection;
 
