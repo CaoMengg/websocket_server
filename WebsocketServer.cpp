@@ -213,7 +213,6 @@ void WebsocketServer::recvMessage( WebsocketConnection *pConnection )
                 int intPayloadLen = pConnection->inBuf[1] & 0x7f;
                 if( intPayloadLen == 126 ) {
                     intPayloadLen = (unsigned char)(pConnection->inBuf[3]) | (unsigned char)(pConnection->inBuf[2]) << 8;
-                    printf("len=%x %d\n", pConnection->inBuf[3], pConnection->inBuf[3]);
                 } else if( intPayloadLen == 127 ) {
                     printf("unsupported payload len, close\n");
                     ev_io_stop(pMainLoop, pConnection->readWatcher);
@@ -221,6 +220,7 @@ void WebsocketServer::recvMessage( WebsocketConnection *pConnection )
                     return;
                 }
                 pConnection->inBufExpectLen = intPayloadLen + 6;    //first 2 byte and 4 mask byte
+                printf("len=%d\n", intPayloadLen);
             } else if( (pConnection->inBuf[0] & 0x0f) == 0x08 ) {
                 //close
                 ev_io_stop(pMainLoop, pConnection->readWatcher);

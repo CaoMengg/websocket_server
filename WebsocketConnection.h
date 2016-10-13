@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include <ev.h>
+#include <WebsocketBuffer.h>
 
 enum enumConnectionStatus
 {
