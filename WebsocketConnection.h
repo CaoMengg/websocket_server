@@ -19,15 +19,14 @@ enum enumConnectionStatus
 class WebsocketConnection
 {
     public:
-        WebsocketConnection(): intFd( 0 ), status( csInit ), readWatcher( NULL ), writeWatcher( NULL ) {
-            inBufSize = 200;
-            inBuf = new char[inBufSize];
+        WebsocketConnection(): intFd( 0 ), status( csInit ) {
+            inBufSize = 1024;
+            inBuf = new unsigned char[inBufSize];
             inBufLen = 0;
             inBufExpectLen = 0;
 
-            outBufSize = 200;
-            outBuf = new char[outBufSize];
-            outBufPos = outBuf;
+            outBufSize = 1024;
+            outBuf = new unsigned char[outBufSize];
             outBufLen = 0;
             outBufSentLen = 0;
         }
@@ -60,13 +59,12 @@ class WebsocketConnection
         ev_io *readWatcher = NULL;
         ev_io *writeWatcher = NULL;
 
-        char *inBuf = NULL;
+        unsigned char *inBuf = NULL;
         int inBufSize;
         int inBufLen;
         int inBufExpectLen;
 
-        char *outBuf = NULL;
-        char *outBufPos;
+        unsigned char *outBuf = NULL;
         int outBufSize;
         int outBufLen;
         int outBufSentLen;

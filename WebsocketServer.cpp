@@ -33,10 +33,9 @@ char *base64encode( const void *b64_encode_this, int encode_this_many_bytes ) {
 void WebsocketServer::ackHandshake( WebsocketConnection *pConnection )
 {
     if( pConnection->outBufSentLen < pConnection->outBufLen ) {
-        int n = send( pConnection->intFd, pConnection->outBufPos, pConnection->outBufLen - pConnection->outBufSentLen, 0 );
+        int n = send( pConnection->intFd, pConnection->outBuf+pConnection->outBufSentLen, pConnection->outBufLen - pConnection->outBufSentLen, 0 );
         if( n > 0 ) {
             pConnection->outBufSentLen += n;
-            pConnection->outBufPos += n;
         }
     }
 
@@ -47,7 +46,6 @@ void WebsocketServer::ackHandshake( WebsocketConnection *pConnection )
 
         pConnection->outBufLen = 0;
         pConnection->outBufSentLen = 0;
-        pConnection->outBufPos = pConnection->outBuf;
 
         pConnection->status = csConnected;
         ev_io_stop(pMainLoop, pConnection->writeWatcher);
@@ -58,10 +56,9 @@ void WebsocketServer::ackHandshake( WebsocketConnection *pConnection )
 void WebsocketServer::ackMessage( WebsocketConnection *pConnection )
 {
     if( pConnection->outBufSentLen < pConnection->outBufLen ) {
-        int n = send( pConnection->intFd, pConnection->outBufPos, pConnection->outBufLen - pConnection->outBufSentLen, 0 );
+        int n = send( pConnection->intFd, pConnection->outBuf+pConnection->outBufSentLen, pConnection->outBufLen - pConnection->outBufSentLen, 0 );
         if( n > 0 ) {
             pConnection->outBufSentLen += n;
-            pConnection->outBufPos += n;
         }
     }
 
@@ -71,7 +68,6 @@ void WebsocketServer::ackMessage( WebsocketConnection *pConnection )
 
         pConnection->outBufLen = 0;
         pConnection->outBufSentLen = 0;
-        pConnection->outBufPos = pConnection->outBuf;
 
         if( pConnection->status == csClosing ) {
             printf("ack close succ, fd=%d\n", pConnection->intFd);
@@ -80,9 +76,9 @@ void WebsocketServer::ackMessage( WebsocketConnection *pConnection )
         }
 
         printf("ack message succ, fd=%d\n", pConnection->intFd);
-        if( pConnection->status == csAccepted ) {
+        /*if( pConnection->status == csAccepted ) {
             pConnection->status = csConnected;
-        }
+        }*/
         ev_io_stop(pMainLoop, pConnection->writeWatcher);
         ev_io_start(pMainLoop, pConnection->readWatcher);
     }
@@ -114,7 +110,7 @@ static void writeCallback( EV_P_ ev_io *watcher, int revents )
 
 void WebsocketServer::parseHandshake( WebsocketConnection *pConnection )
 {
-    char *begin = strstr(pConnection->inBuf, "Sec-WebSocket-Key:");
+    char *begin = strstr((char*)(pConnection->inBuf), "Sec-WebSocket-Key:");
     begin += 19;
     char *end = strchr(begin, '\r');
     int len = end - begin;
@@ -130,11 +126,11 @@ void WebsocketServer::parseHandshake( WebsocketConnection *pConnection )
     SHA1((unsigned char*)joinedKey, strlen( joinedKey ), sha1Code);
 
     char* base64Code = base64encode( sha1Code, SHA_DIGEST_LENGTH );
-    sprintf( pConnection->outBuf, "HTTP/1.1 101 Switching Protocols\r\n"
+    sprintf( (char*)(pConnection->outBuf), "HTTP/1.1 101 Switching Protocols\r\n"
                                   "Upgrade: websocket\r\n"
                                   "Connection: Upgrade\r\n"
                                   "Sec-WebSocket-Accept: %s\r\n\r\n", base64Code );
-    pConnection->outBufLen = strlen( pConnection->outBuf );
+    pConnection->outBufLen = strlen( (char*)(pConnection->outBuf) );
 
     ev_io *writeWatcher = new ev_io();
     ev_io_init( writeWatcher, writeCallback, pConnection->intFd, EV_WRITE );
@@ -168,16 +164,30 @@ void WebsocketServer::recvHandshake( WebsocketConnection *pConnection )
 
 void WebsocketServer::parseMessage( WebsocketConnection *pConnection )
 {
-    int payloadLen = pConnection->inBuf[1] & 0x7f;
+    int intPayloadLen = pConnection->inBuf[1] & 0x7f;
     pConnection->outBuf[0] = 0x81;
-    pConnection->outBuf[1] = payloadLen;
-    int curIndex = 2;
+    pConnection->outBuf[1] = intPayloadLen;
 
-    int i;
-    for( i=6; i<6+payloadLen; ++i ) {
-        pConnection->outBuf[ curIndex++ ] =  pConnection->inBuf[i] ^ pConnection->inBuf[(i-6)%4 + 2];
+    if( intPayloadLen == 126 ) {
+        intPayloadLen = int(pConnection->inBuf[2])*256 + int(pConnection->inBuf[3]);
+        pConnection->outBuf[2] = pConnection->inBuf[2];
+        pConnection->outBuf[3] = pConnection->inBuf[3];
+        pConnection->outBufLen = intPayloadLen + 4;
+
+        int curIndex = 4;
+        int i;
+        for( i=8; i<8+intPayloadLen; ++i ) {
+            pConnection->outBuf[ curIndex++ ] =  pConnection->inBuf[i] ^ pConnection->inBuf[(i-8)%4 + 4];
+        }
+    } else {
+        pConnection->outBufLen = intPayloadLen + 2;
+
+        int curIndex = 2;
+        int i;
+        for( i=6; i<6+intPayloadLen; ++i ) {
+            pConnection->outBuf[ curIndex++ ] =  pConnection->inBuf[i] ^ pConnection->inBuf[(i-6)%4 + 2];
+        }
     }
-    pConnection->outBufLen = payloadLen + 2;
 
     ev_io_start(pMainLoop, pConnection->writeWatcher);
 }
@@ -195,7 +205,6 @@ void WebsocketServer::closeConnection( WebsocketConnection *pConnection )
 void WebsocketServer::recvMessage( WebsocketConnection *pConnection )
 {
     int n = recv( pConnection->intFd, pConnection->inBuf+pConnection->inBufLen, pConnection->inBufSize-pConnection->inBufLen, 0 );
-    printf("%d %d\n", pConnection->inBufLen, pConnection->inBufSize);
     if( n > 0 ) {
         if( pConnection->inBufExpectLen == 0 ) {
             if( (pConnection->inBuf[0] & 0x0f) == 0x01 && (pConnection->inBuf[1] & 0x80) == 0x80 )
@@ -203,7 +212,8 @@ void WebsocketServer::recvMessage( WebsocketConnection *pConnection )
                 //text
                 int intPayloadLen = pConnection->inBuf[1] & 0x7f;
                 if( intPayloadLen == 126 ) {
-                    intPayloadLen = int(pConnection->inBuf[2])*256 + int(pConnection->inBuf[3]);
+                    intPayloadLen = (unsigned char)(pConnection->inBuf[3]) | (unsigned char)(pConnection->inBuf[2]) << 8;
+                    printf("len=%x %d\n", pConnection->inBuf[3], pConnection->inBuf[3]);
                 } else if( intPayloadLen == 127 ) {
                     printf("unsupported payload len, close\n");
                     ev_io_stop(pMainLoop, pConnection->readWatcher);
@@ -211,7 +221,6 @@ void WebsocketServer::recvMessage( WebsocketConnection *pConnection )
                     return;
                 }
                 pConnection->inBufExpectLen = intPayloadLen + 6;    //first 2 byte and 4 mask byte
-                printf("len=%d\n", pConnection->inBufExpectLen);
             } else if( (pConnection->inBuf[0] & 0x0f) == 0x08 ) {
                 //close
                 ev_io_stop(pMainLoop, pConnection->readWatcher);

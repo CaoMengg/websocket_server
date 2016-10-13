@@ -2,7 +2,7 @@
 
 void WebsocketConnection::enlargeInBuf() {
     int intNewSize = inBufSize * 2;
-    char *newBuf = new char[intNewSize];
+    unsigned char *newBuf = new unsigned char[intNewSize];
     memcpy( newBuf, inBuf, inBufSize );
     delete[] inBuf;
 
