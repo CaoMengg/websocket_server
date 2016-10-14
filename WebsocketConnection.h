@@ -21,10 +21,7 @@ class WebsocketConnection
 {
     public:
         WebsocketConnection(): intFd( 0 ), status( csInit ) {
-            inBufSize = 1024;
-            inBuf = new unsigned char[inBufSize];
-            inBufLen = 0;
-            inBufExpectLen = 0;
+            inBuf = new WebsocketBuffer( 200 );
 
             outBufSize = 1024;
             outBuf = new unsigned char[outBufSize];
@@ -45,9 +42,6 @@ class WebsocketConnection
                 close( intFd );
             }
 
-            if( inBuf ) {
-                delete[] inBuf;
-            }
             if( outBuf ) {
                 delete[] outBuf;
             }
@@ -60,17 +54,12 @@ class WebsocketConnection
         ev_io *readWatcher = NULL;
         ev_io *writeWatcher = NULL;
 
-        unsigned char *inBuf = NULL;
-        int inBufSize;
-        int inBufLen;
-        int inBufExpectLen;
+        WebsocketBuffer *inBuf = NULL;
 
         unsigned char *outBuf = NULL;
         int outBufSize;
         int outBufLen;
         int outBufSentLen;
-
-        void enlargeInBuf();
 };
 
 #endif
