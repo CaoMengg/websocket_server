@@ -32,20 +32,33 @@ char *base64encode( const void *b64_encode_this, int encode_this_many_bytes ) {
 
 void WebsocketServer::ackHandshake( WebsocketConnection *pConnection )
 {
-    if( pConnection->outBufSentLen < pConnection->outBufLen ) {
-        int n = send( pConnection->intFd, pConnection->outBuf+pConnection->outBufSentLen, pConnection->outBufLen - pConnection->outBufSentLen, 0 );
+    if( pConnection->outBufList.empty() )
+    {
+        return;
+    }
+
+    WebsocketBuffer *outBuf = pConnection->outBufList.front();
+    if( outBuf->intSentLen < outBuf->intLen ) {
+        int n = send( pConnection->intFd, outBuf->data + outBuf->intSentLen, outBuf->intLen - outBuf->intSentLen, 0 );
         if( n > 0 ) {
-            pConnection->outBufSentLen += n;
+            outBuf->intSentLen += n;
+        } else {
+            if( errno==EAGAIN || errno==EWOULDBLOCK ) {
+                return;
+            } else {
+                delete pConnection;
+                return;
+            }
         }
     }
 
-    if( pConnection->outBufSentLen >= pConnection->outBufLen ) {
+    if( outBuf->intSentLen >= outBuf->intLen ) {
         printf("handshake succ, fd=%d\n", pConnection->intFd);
         pConnection->inBuf->intLen = 0;
         pConnection->inBuf->intExpectLen = 0;
 
-        pConnection->outBufLen = 0;
-        pConnection->outBufSentLen = 0;
+        pConnection->outBufList.pop_front();
+        delete outBuf;
 
         pConnection->status = csConnected;
         ev_io_stop(pMainLoop, pConnection->writeWatcher);
@@ -55,32 +68,41 @@ void WebsocketServer::ackHandshake( WebsocketConnection *pConnection )
 
 void WebsocketServer::ackMessage( WebsocketConnection *pConnection )
 {
-    if( pConnection->outBufSentLen < pConnection->outBufLen ) {
-        int n = send( pConnection->intFd, pConnection->outBuf+pConnection->outBufSentLen, pConnection->outBufLen - pConnection->outBufSentLen, 0 );
-        if( n > 0 ) {
-            pConnection->outBufSentLen += n;
-        }
-    }
-
-    if( pConnection->outBufSentLen >= pConnection->outBufLen ) {
-        pConnection->inBuf->intLen = 0;
-        pConnection->inBuf->intExpectLen = 0;
-
-        pConnection->outBufLen = 0;
-        pConnection->outBufSentLen = 0;
-
-        if( pConnection->status == csClosing ) {
-            printf("ack close succ, fd=%d\n", pConnection->intFd);
-            delete pConnection;
-            return;
+    WebsocketBuffer *outBuf = NULL;
+    while( ! pConnection->outBufList.empty() )
+    {
+        outBuf = pConnection->outBufList.front();
+        if( outBuf->intSentLen < outBuf->intLen ) {
+            int n = send( pConnection->intFd, outBuf->data + outBuf->intSentLen, outBuf->intLen - outBuf->intSentLen, 0 );
+            if( n > 0 ) {
+                outBuf->intSentLen += n;
+            } else {
+                if( errno==EAGAIN || errno==EWOULDBLOCK ) {
+                    return;
+                } else {
+                    delete pConnection;
+                    return;
+                }
+            }
         }
 
-        printf("ack message succ, fd=%d\n", pConnection->intFd);
-        /*if( pConnection->status == csAccepted ) {
-            pConnection->status = csConnected;
-        }*/
-        ev_io_stop(pMainLoop, pConnection->writeWatcher);
-        ev_io_start(pMainLoop, pConnection->readWatcher);
+        if( outBuf->intSentLen >= outBuf->intLen ) {
+            pConnection->inBuf->intLen = 0;
+            pConnection->inBuf->intExpectLen = 0;
+
+            pConnection->outBufList.pop_front();
+            delete outBuf;
+
+            if( pConnection->status == csClosing ) {
+                printf("ack close succ, fd=%d\n", pConnection->intFd);
+                delete pConnection;
+                return;
+            } else {
+                printf("ack message succ, fd=%d\n", pConnection->intFd);
+                ev_io_stop(pMainLoop, pConnection->writeWatcher);
+                ev_io_start(pMainLoop, pConnection->readWatcher);
+            }
+        }
     }
 }
 
@@ -124,13 +146,15 @@ void WebsocketServer::parseHandshake( WebsocketConnection *pConnection )
 
     unsigned char sha1Code[SHA_DIGEST_LENGTH];
     SHA1((unsigned char*)joinedKey, strlen( joinedKey ), sha1Code);
-
     char* base64Code = base64encode( sha1Code, SHA_DIGEST_LENGTH );
-    sprintf( (char*)(pConnection->outBuf), "HTTP/1.1 101 Switching Protocols\r\n"
-                                  "Upgrade: websocket\r\n"
-                                  "Connection: Upgrade\r\n"
-                                  "Sec-WebSocket-Accept: %s\r\n\r\n", base64Code );
-    pConnection->outBufLen = strlen( (char*)(pConnection->outBuf) );
+
+    WebsocketBuffer* outBuf = new WebsocketBuffer( 200 );
+    sprintf( (char*)(outBuf->data), "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            "Sec-WebSocket-Accept: %s\r\n\r\n", base64Code );
+    outBuf->intLen = strlen( (char*)(outBuf->data) );
+    pConnection->outBufList.push_back( outBuf );
 
     ev_io *writeWatcher = new ev_io();
     ev_io_init( writeWatcher, writeCallback, pConnection->intFd, EV_WRITE );
@@ -155,6 +179,7 @@ void WebsocketServer::recvHandshake( WebsocketConnection *pConnection )
         return;
     } else {
         if( errno==EAGAIN || errno==EWOULDBLOCK ) {
+            return;
         } else {
             delete pConnection;
             return;
@@ -165,38 +190,42 @@ void WebsocketServer::recvHandshake( WebsocketConnection *pConnection )
 void WebsocketServer::parseMessage( WebsocketConnection *pConnection )
 {
     int intPayloadLen = pConnection->inBuf->data[1] & 0x7f;
-    pConnection->outBuf[0] = 0x81;
-    pConnection->outBuf[1] = intPayloadLen;
+    WebsocketBuffer* outBuf = new WebsocketBuffer( 200 );
+    outBuf->data[0] = 0x81;
+    outBuf->data[1] = intPayloadLen;
 
     if( intPayloadLen == 126 ) {
         intPayloadLen = int(pConnection->inBuf->data[2])*256 + int(pConnection->inBuf->data[3]);
-        pConnection->outBuf[2] = pConnection->inBuf->data[2];
-        pConnection->outBuf[3] = pConnection->inBuf->data[3];
-        pConnection->outBufLen = intPayloadLen + 4;
+        outBuf->data[2] = pConnection->inBuf->data[2];
+        outBuf->data[3] = pConnection->inBuf->data[3];
+        outBuf->intLen = intPayloadLen + 4;
 
         int curIndex = 4;
         int i;
         for( i=8; i<8+intPayloadLen; ++i ) {
-            pConnection->outBuf[ curIndex++ ] =  pConnection->inBuf->data[i] ^ pConnection->inBuf->data[(i-8)%4 + 4];
+            outBuf->data[ curIndex++ ] =  pConnection->inBuf->data[i] ^ pConnection->inBuf->data[(i-8)%4 + 4];
         }
     } else {
-        pConnection->outBufLen = intPayloadLen + 2;
+        outBuf->intLen = intPayloadLen + 2;
 
         int curIndex = 2;
         int i;
         for( i=6; i<6+intPayloadLen; ++i ) {
-            pConnection->outBuf[ curIndex++ ] =  pConnection->inBuf->data[i] ^ pConnection->inBuf->data[(i-6)%4 + 2];
+            outBuf->data[ curIndex++ ] =  pConnection->inBuf->data[i] ^ pConnection->inBuf->data[(i-6)%4 + 2];
         }
     }
+    pConnection->outBufList.push_back( outBuf );
 
     ev_io_start(pMainLoop, pConnection->writeWatcher);
 }
 
 void WebsocketServer::closeConnection( WebsocketConnection *pConnection )
 {
-    pConnection->outBuf[0] = 0x88;
-    pConnection->outBuf[1] = 0;
-    pConnection->outBufLen = 2;
+    WebsocketBuffer* outBuf = new WebsocketBuffer( 100 );
+    outBuf->data[0] = 0x88;
+    outBuf->data[1] = 0;
+    outBuf->intLen = 2;
+    pConnection->outBufList.push_back( outBuf );
 
     pConnection->status = csClosing;
     ev_io_start(pMainLoop, pConnection->writeWatcher);
@@ -245,6 +274,7 @@ void WebsocketServer::recvMessage( WebsocketConnection *pConnection )
         return;
     } else {
         if( errno==EAGAIN || errno==EWOULDBLOCK ) {
+            return;
         } else {
             delete pConnection;
             return;
@@ -297,12 +327,6 @@ void WebsocketServer::acceptCB()
     pConnection->pLoop = pMainLoop;
     pConnection->intFd = acceptFd;
     pConnection->status = csAccepted;
-
-    connectionMap::iterator it;
-    mapConnection.find( acceptFd );
-    if( it != mapConnection.end() ) {
-        //TODO close connect
-    }
     mapConnection[ acceptFd ] = pConnection;
 
     ev_io *readWatcher = new ev_io();

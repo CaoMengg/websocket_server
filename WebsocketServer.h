@@ -1,9 +1,6 @@
 #ifndef WEBSOCKETSERVER_H
 #define WEBSOCKETSERVER_H
 
-#include <map>
-#include <WebsocketConnection.h>
-
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <fcntl.h>
@@ -15,6 +12,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <openssl/pem.h>
+
+#include <map>
+#include <WebsocketConnection.h>
 
 typedef std::map<int, WebsocketConnection*> connectionMap;
 typedef std::pair<int, WebsocketConnection*> connectionPair;

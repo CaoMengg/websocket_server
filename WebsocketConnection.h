@@ -5,9 +5,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-
 #include <ev.h>
+
+#include <list>
 #include <WebsocketBuffer.h>
+
+typedef std::list<WebsocketBuffer*> bufferList;
 
 enum enumConnectionStatus
 {
@@ -22,11 +25,6 @@ class WebsocketConnection
     public:
         WebsocketConnection(): intFd( 0 ), status( csInit ) {
             inBuf = new WebsocketBuffer( 200 );
-
-            outBufSize = 1024;
-            outBuf = new unsigned char[outBufSize];
-            outBufLen = 0;
-            outBufSentLen = 0;
         }
         ~WebsocketConnection() {
             if( readWatcher && pLoop ) {
@@ -42,9 +40,11 @@ class WebsocketConnection
                 close( intFd );
             }
 
-            if( outBuf ) {
-                delete[] outBuf;
+            if( inBuf ) {
+                delete inBuf;
             }
+
+            //TODO clear outBufList
 
             printf("delete connection, fd=%d\n", intFd);
         }
@@ -55,11 +55,7 @@ class WebsocketConnection
         ev_io *writeWatcher = NULL;
 
         WebsocketBuffer *inBuf = NULL;
-
-        unsigned char *outBuf = NULL;
-        int outBufSize;
-        int outBufLen;
-        int outBufSentLen;
+        bufferList outBufList;
 };
 
 #endif

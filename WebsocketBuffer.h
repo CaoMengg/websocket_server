@@ -22,7 +22,7 @@ class WebsocketBuffer
         int intSize = 0;
         int intLen = 0;
         int intExpectLen = 0;
-        int intPos = 0;
+        int intSentLen = 0;
 };
 
 #endif
