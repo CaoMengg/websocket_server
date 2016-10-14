@@ -54,8 +54,6 @@ void WebsocketServer::ackHandshake( WebsocketConnection *pConnection )
 
     if( outBuf->intSentLen >= outBuf->intLen ) {
         printf("handshake succ, fd=%d\n", pConnection->intFd);
-        pConnection->inBuf->intLen = 0;
-        pConnection->inBuf->intExpectLen = 0;
 
         pConnection->outBufList.pop_front();
         delete outBuf;
@@ -87,9 +85,6 @@ void WebsocketServer::ackMessage( WebsocketConnection *pConnection )
         }
 
         if( outBuf->intSentLen >= outBuf->intLen ) {
-            pConnection->inBuf->intLen = 0;
-            pConnection->inBuf->intExpectLen = 0;
-
             pConnection->outBufList.pop_front();
             delete outBuf;
 
@@ -156,6 +151,9 @@ void WebsocketServer::parseHandshake( WebsocketConnection *pConnection )
     outBuf->intLen = strlen( (char*)(outBuf->data) );
     pConnection->outBufList.push_back( outBuf );
 
+    pConnection->inBuf->intLen = 0;
+    pConnection->inBuf->intExpectLen = 0;
+
     ev_io *writeWatcher = new ev_io();
     ev_io_init( writeWatcher, writeCallback, pConnection->intFd, EV_WRITE );
     pConnection->writeWatcher = writeWatcher;
@@ -215,6 +213,9 @@ void WebsocketServer::parseMessage( WebsocketConnection *pConnection )
         }
     }
     pConnection->outBufList.push_back( outBuf );
+
+    pConnection->inBuf->intLen = 0;
+    pConnection->inBuf->intExpectLen = 0;
 
     ev_io_start(pMainLoop, pConnection->writeWatcher);
 }
