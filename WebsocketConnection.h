@@ -10,7 +10,7 @@
 #include <list>
 #include <WebsocketBuffer.h>
 
-typedef std::list<WebsocketBuffer*> bufferList;
+typedef std::list<WebsocketBuffer *> bufferList;
 
 enum enumConnectionStatus
 {
@@ -23,8 +23,8 @@ enum enumConnectionStatus
 class WebsocketConnection
 {
     public:
-        WebsocketConnection(): intFd( 0 ), status( csInit ) {
-            inBuf = new WebsocketBuffer( 200 );
+        WebsocketConnection() {
+            inBuf = new WebsocketBuffer( 1024 );
         }
         ~WebsocketConnection() {
             if( readWatcher && pLoop ) {
@@ -44,13 +44,16 @@ class WebsocketConnection
                 delete inBuf;
             }
 
-            //TODO clear outBufList
+            while( ! outBufList.empty() ) {
+                delete outBufList.front();
+                outBufList.pop_front();
+            }
 
             printf("delete connection, fd=%d\n", intFd);
         }
         struct ev_loop *pLoop = NULL;
-        int intFd;
-        enumConnectionStatus status;
+        int intFd = 0;
+        enumConnectionStatus status = csInit;
         ev_io *readWatcher = NULL;
         ev_io *writeWatcher = NULL;
 
