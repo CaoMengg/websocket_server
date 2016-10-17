@@ -1,6 +1,6 @@
-#include <WebsocketBuffer.h>
+#include <SocketBuffer.h>
 
-void WebsocketBuffer::enlarge() {
+void SocketBuffer::enlarge() {
     int intNewSize = intSize * 2;
     unsigned char *newData = new unsigned char[intNewSize];
     memcpy( newData, data, intSize );

@@ -8,9 +8,9 @@
 #include <ev.h>
 
 #include <list>
-#include <WebsocketBuffer.h>
+#include <SocketBuffer.h>
 
-typedef std::list<WebsocketBuffer *> bufferList;
+typedef std::list<SocketBuffer *> bufferList;
 
 enum enumConnectionStatus
 {
@@ -24,7 +24,7 @@ class WebsocketConnection
 {
     public:
         WebsocketConnection() {
-            inBuf = new WebsocketBuffer( 1024 );
+            inBuf = new SocketBuffer( 1024 );
         }
         ~WebsocketConnection() {
             if( readWatcher && pLoop ) {
@@ -57,7 +57,7 @@ class WebsocketConnection
         ev_io *readWatcher = NULL;
         ev_io *writeWatcher = NULL;
 
-        WebsocketBuffer *inBuf = NULL;
+        SocketBuffer *inBuf = NULL;
         bufferList outBufList;
 };
 

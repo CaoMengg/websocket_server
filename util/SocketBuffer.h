@@ -1,17 +1,17 @@
-#ifndef WEBSOCKETBUFFER_H
-#define WEBSOCKETBUFFER_H
+#ifndef SOCKETBUFFER_H
+#define SOCKETBUFFER_H
 
 #include <stdio.h>
 #include <string.h>
 
-class WebsocketBuffer
+class SocketBuffer
 {
     public:
-        WebsocketBuffer( int intBufferSize ) {
+        SocketBuffer( int intBufferSize ) {
             intSize = intBufferSize;
             data = new unsigned char[intSize];
         }
-        ~WebsocketBuffer() {
+        ~SocketBuffer() {
             if( data ) {
                 delete[] data;
             }

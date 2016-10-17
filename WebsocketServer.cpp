@@ -37,7 +37,7 @@ void WebsocketServer::ackHandshake( WebsocketConnection *pConnection )
         return;
     }
 
-    WebsocketBuffer *outBuf = pConnection->outBufList.front();
+    SocketBuffer *outBuf = pConnection->outBufList.front();
     if( outBuf->intSentLen < outBuf->intLen ) {
         int n = send( pConnection->intFd, outBuf->data + outBuf->intSentLen, outBuf->intLen - outBuf->intSentLen, 0 );
         if( n > 0 ) {
@@ -65,7 +65,7 @@ void WebsocketServer::ackHandshake( WebsocketConnection *pConnection )
 
 void WebsocketServer::ackMessage( WebsocketConnection *pConnection )
 {
-    WebsocketBuffer *outBuf = NULL;
+    SocketBuffer *outBuf = NULL;
     while( ! pConnection->outBufList.empty() )
     {
         outBuf = pConnection->outBufList.front();
@@ -141,7 +141,7 @@ void WebsocketServer::parseHandshake( WebsocketConnection *pConnection )
     SHA1((unsigned char*)joinedKey, strlen( joinedKey ), sha1Code);
     char* base64Code = base64encode( sha1Code, SHA_DIGEST_LENGTH );
 
-    WebsocketBuffer* outBuf = new WebsocketBuffer( 200 );
+    SocketBuffer* outBuf = new SocketBuffer( 200 );
     sprintf( (char*)(outBuf->data), "HTTP/1.1 101 Switching Protocols\r\n"
             "Upgrade: websocket\r\n"
             "Connection: Upgrade\r\n"
@@ -185,13 +185,13 @@ void WebsocketServer::recvHandshake( WebsocketConnection *pConnection )
 
 void WebsocketServer::parseMessage( WebsocketConnection *pConnection )
 {
-    WebsocketBuffer* outBuf;
+    SocketBuffer* outBuf;
     int intPayloadLen = pConnection->inBuf->data[1] & 0x7f;
     int intRealLen = 0;
 
     if( intPayloadLen == 126 ) {
         intRealLen = int(pConnection->inBuf->data[2])*256 + int(pConnection->inBuf->data[3]);
-        outBuf = new WebsocketBuffer( intRealLen + 4 );
+        outBuf = new SocketBuffer( intRealLen + 4 );
         outBuf->intLen = intRealLen + 4;
         outBuf->data[0] = 0x81;
         outBuf->data[1] = intPayloadLen;
@@ -205,7 +205,7 @@ void WebsocketServer::parseMessage( WebsocketConnection *pConnection )
         }
     } else {
         intRealLen = intPayloadLen;
-        outBuf = new WebsocketBuffer( intRealLen + 2 );
+        outBuf = new SocketBuffer( intRealLen + 2 );
         outBuf->intLen = intRealLen + 2;
         outBuf->data[0] = 0x81;
         outBuf->data[1] = intPayloadLen;
@@ -226,7 +226,7 @@ void WebsocketServer::parseMessage( WebsocketConnection *pConnection )
 
 void WebsocketServer::closeConnection( WebsocketConnection *pConnection )
 {
-    WebsocketBuffer* outBuf = new WebsocketBuffer( 2 );
+    SocketBuffer* outBuf = new SocketBuffer( 2 );
     outBuf->data[0] = 0x88;
     outBuf->data[1] = 0;
     outBuf->intLen = 2;
