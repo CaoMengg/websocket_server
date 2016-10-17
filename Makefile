@@ -1,4 +1,4 @@
-OBJS = util/SocketBuffer.o WebsocketConnection.o WebsocketServer.o
+OBJS = util/SocketBuffer.o util/SocketConnection.o WebsocketServer.o
 CFLAGS = -W -Wall -Wunused-value -std=c++11 -g -rdynamic
 DEPENDS = -lpthread -lev -lcrypto
 INCLUDE = -I. -Iutil/
@@ -9,10 +9,10 @@ wserver: server.cpp server.h $(OBJS)
 util/SocketBuffer.o: util/SocketBuffer.cpp util/SocketBuffer.h
 	$(CXX) $(CFLAGS) -c $< $(INCLUDE) -o $@
 
-WebsocketConnection.o: WebsocketConnection.cpp WebsocketConnection.h
+util/SocketConnection.o: util/SocketConnection.cpp util/SocketConnection.h
 	$(CXX) $(CFLAGS) -c $< $(INCLUDE) $(DEPENDS) -o $@
 
-WebsocketServer.o: WebsocketServer.cpp WebsocketServer.h WebsocketConnection.o util/SocketBuffer.o
+WebsocketServer.o: WebsocketServer.cpp WebsocketServer.h util/SocketConnection.o util/SocketBuffer.o
 	$(CXX) $(CFLAGS) -c $< $(INCLUDE) $(DEPENDS) -o $@
 
 .PHONY: clean

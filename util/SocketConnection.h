@@ -1,5 +1,5 @@
-#ifndef WEBSOCKETCONNECTION_H
-#define WEBSOCKETCONNECTION_H
+#ifndef SOCKETCONNECTION_H
+#define SOCKETCONNECTION_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,13 +20,13 @@ enum enumConnectionStatus
     csClosing,
 };
 
-class WebsocketConnection
+class SocketConnection
 {
     public:
-        WebsocketConnection() {
+        SocketConnection() {
             inBuf = new SocketBuffer( 1024 );
         }
-        ~WebsocketConnection() {
+        ~SocketConnection() {
             if( readWatcher && pLoop ) {
                 ev_io_stop( pLoop, readWatcher );
                 delete readWatcher;

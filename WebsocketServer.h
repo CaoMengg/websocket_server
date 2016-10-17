@@ -14,10 +14,10 @@
 #include <openssl/pem.h>
 
 #include <map>
-#include <WebsocketConnection.h>
+#include <SocketConnection.h>
 
-typedef std::map<int, WebsocketConnection*> connectionMap;
-typedef std::pair<int, WebsocketConnection*> connectionPair;
+typedef std::map<int, SocketConnection*> connectionMap;
+typedef std::pair<int, SocketConnection*> connectionPair;
 
 class WebsocketServer
 {
@@ -39,13 +39,13 @@ class WebsocketServer
         void acceptCB();
         void readCB( int intFd );
         void writeCB( int intFd );
-        void recvHandshake( WebsocketConnection *pConnection );
-        void recvMessage( WebsocketConnection *pConnection );
-        void parseHandshake( WebsocketConnection *pConnection );
-        void parseMessage( WebsocketConnection *pConnection );
-        void ackHandshake( WebsocketConnection *pConnection );
-        void ackMessage( WebsocketConnection *pConnection );
-        void closeConnection( WebsocketConnection *pConnection );
+        void recvHandshake( SocketConnection *pConnection );
+        void recvMessage( SocketConnection *pConnection );
+        void parseHandshake( SocketConnection *pConnection );
+        void parseMessage( SocketConnection *pConnection );
+        void ackHandshake( SocketConnection *pConnection );
+        void ackMessage( SocketConnection *pConnection );
+        void closeConnection( SocketConnection *pConnection );
 };
 
 #endif

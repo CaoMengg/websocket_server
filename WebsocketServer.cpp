@@ -30,7 +30,7 @@ char *base64encode( const void *b64_encode_this, int encode_this_many_bytes ) {
     return (*mem_bio_mem_ptr).data; //Returns base-64 encoded data. (See: "buf_mem_st" struct).
 }
 
-void WebsocketServer::ackHandshake( WebsocketConnection *pConnection )
+void WebsocketServer::ackHandshake( SocketConnection *pConnection )
 {
     if( pConnection->outBufList.empty() )
     {
@@ -63,7 +63,7 @@ void WebsocketServer::ackHandshake( WebsocketConnection *pConnection )
     }
 }
 
-void WebsocketServer::ackMessage( WebsocketConnection *pConnection )
+void WebsocketServer::ackMessage( SocketConnection *pConnection )
 {
     SocketBuffer *outBuf = NULL;
     while( ! pConnection->outBufList.empty() )
@@ -107,7 +107,7 @@ void WebsocketServer::writeCB( int intFd )
     if( it == mapConnection.end() ) {
         return;
     }
-    WebsocketConnection* pConnection = it->second;
+    SocketConnection* pConnection = it->second;
 
     if( pConnection->status == csAccepted ) {
         ackHandshake( pConnection );
@@ -123,7 +123,7 @@ static void writeCallback( EV_P_ ev_io *watcher, int revents )
     WebsocketServer::getInstance()->writeCB( watcher->fd );
 }
 
-void WebsocketServer::parseHandshake( WebsocketConnection *pConnection )
+void WebsocketServer::parseHandshake( SocketConnection *pConnection )
 {
     char *begin = strstr((char*)(pConnection->inBuf->data), "Sec-WebSocket-Key:");
     begin += 19;
@@ -158,7 +158,7 @@ void WebsocketServer::parseHandshake( WebsocketConnection *pConnection )
     ev_io_start( pMainLoop, writeWatcher );
 }
 
-void WebsocketServer::recvHandshake( WebsocketConnection *pConnection )
+void WebsocketServer::recvHandshake( SocketConnection *pConnection )
 {
     int n = recv( pConnection->intFd, pConnection->inBuf->data + pConnection->inBuf->intLen, pConnection->inBuf->intSize - pConnection->inBuf->intLen, 0 );
     if( n > 0 ) {
@@ -183,7 +183,7 @@ void WebsocketServer::recvHandshake( WebsocketConnection *pConnection )
     }
 }
 
-void WebsocketServer::parseMessage( WebsocketConnection *pConnection )
+void WebsocketServer::parseMessage( SocketConnection *pConnection )
 {
     SocketBuffer* outBuf;
     int intPayloadLen = pConnection->inBuf->data[1] & 0x7f;
@@ -224,7 +224,7 @@ void WebsocketServer::parseMessage( WebsocketConnection *pConnection )
     ev_io_start(pMainLoop, pConnection->writeWatcher);
 }
 
-void WebsocketServer::closeConnection( WebsocketConnection *pConnection )
+void WebsocketServer::closeConnection( SocketConnection *pConnection )
 {
     SocketBuffer* outBuf = new SocketBuffer( 2 );
     outBuf->data[0] = 0x88;
@@ -236,7 +236,7 @@ void WebsocketServer::closeConnection( WebsocketConnection *pConnection )
     ev_io_start(pMainLoop, pConnection->writeWatcher);
 }
 
-void WebsocketServer::recvMessage( WebsocketConnection *pConnection )
+void WebsocketServer::recvMessage( SocketConnection *pConnection )
 {
     int n = recv( pConnection->intFd, pConnection->inBuf->data + pConnection->inBuf->intLen, pConnection->inBuf->intSize - pConnection->inBuf->intLen, 0 );
     if( n > 0 ) {
@@ -294,7 +294,7 @@ void WebsocketServer::readCB( int intFd )
     if( it == mapConnection.end() ) {
         return;
     }
-    WebsocketConnection* pConnection = it->second;
+    SocketConnection* pConnection = it->second;
 
     if( pConnection->inBuf->intLen >= pConnection->inBuf->intSize ) {
         pConnection->inBuf->enlarge();
@@ -327,7 +327,7 @@ void WebsocketServer::acceptCB()
     fcntl(acceptFd, F_SETFL, flag | O_NONBLOCK);
     printf("accept fd=%d\n", acceptFd);
 
-    WebsocketConnection* pConnection = new WebsocketConnection();
+    SocketConnection* pConnection = new SocketConnection();
     pConnection->pLoop = pMainLoop;
     pConnection->intFd = acceptFd;
     pConnection->status = csAccepted;
