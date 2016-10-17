@@ -1,4 +1,4 @@
-#include <server.h>
+#include <main.h>
 
 int main()
 {
