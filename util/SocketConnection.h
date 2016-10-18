@@ -25,6 +25,11 @@ class SocketConnection
     public:
         SocketConnection() {
             inBuf = new SocketBuffer( 1024 );
+
+            readWatcher = new ev_io();
+            writeWatcher = new ev_io();
+            readTimer = new ev_timer();
+            readTimer->data = this;
         }
         ~SocketConnection() {
             if( readWatcher && pLoop ) {
@@ -56,6 +61,8 @@ class SocketConnection
         enumConnectionStatus status = csInit;
         ev_io *readWatcher = NULL;
         ev_io *writeWatcher = NULL;
+        ev_timer *readTimer = NULL;
+        ev_tstamp readTimeout = 2.0;
 
         SocketBuffer *inBuf = NULL;
         bufferList outBufList;
