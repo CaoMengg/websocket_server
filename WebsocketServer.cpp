@@ -52,6 +52,26 @@ static void readTimeoutCallback( EV_P_ ev_timer *timer, int revents )
     WebsocketServer::getInstance()->readTimeoutCB( ((SocketConnection *)timer->data)->intFd );
 }
 
+void WebsocketServer::writeTimeoutCB( int intFd )
+{
+    connectionMap::iterator it;
+    it = mapConnection.find( intFd );
+    if( it == mapConnection.end() )
+    {
+        return;
+    }
+    SocketConnection* pConnection = it->second;
+    printf("write time out, fd=%d\n", intFd);
+    delete pConnection;
+}
+
+static void writeTimeoutCallback( EV_P_ ev_timer *timer, int revents )
+{
+    (void)loop;
+    (void)revents;
+    WebsocketServer::getInstance()->writeTimeoutCB( ((SocketConnection *)timer->data)->intFd );
+}
+
 void WebsocketServer::ackHandshake( SocketConnection *pConnection )
 {
     if( pConnection->outBufList.empty() )
@@ -85,7 +105,8 @@ void WebsocketServer::ackHandshake( SocketConnection *pConnection )
         delete outBuf;
 
         pConnection->status = csConnected;
-        ev_io_stop(pMainLoop, pConnection->writeWatcher);
+        ev_io_stop( pMainLoop, pConnection->writeWatcher );
+        ev_timer_stop( pMainLoop, pConnection->writeTimer );
     }
 }
 
@@ -124,10 +145,12 @@ void WebsocketServer::ackMessage( SocketConnection *pConnection )
                 return;
             } else {
                 printf("ack message succ, fd=%d\n", pConnection->intFd);
-                ev_io_stop(pMainLoop, pConnection->writeWatcher);
             }
         }
     }
+
+    ev_io_stop( pMainLoop, pConnection->writeWatcher );
+    ev_timer_stop( pMainLoop, pConnection->writeTimer );
 }
 
 void WebsocketServer::writeCB( int intFd )
@@ -187,6 +210,9 @@ void WebsocketServer::parseHandshake( SocketConnection *pConnection )
 
     ev_io_init( pConnection->writeWatcher, writeCallback, pConnection->intFd, EV_WRITE );
     ev_io_start( pMainLoop, pConnection->writeWatcher );
+
+    ev_timer_set( pConnection->writeTimer, pConnection->writeTimeout, 0.0 );
+    ev_timer_start( pMainLoop, pConnection->writeTimer );
 }
 
 void WebsocketServer::recvHandshake( SocketConnection *pConnection )
@@ -197,8 +223,7 @@ void WebsocketServer::recvHandshake( SocketConnection *pConnection )
         pConnection->inBuf->intLen += n;
 
         if( pConnection->inBuf->data[pConnection->inBuf->intLen-4]=='\r' && pConnection->inBuf->data[pConnection->inBuf->intLen-3]=='\n' &&
-                pConnection->inBuf->data[pConnection->inBuf->intLen-2]=='\r' && pConnection->inBuf->data[pConnection->inBuf->intLen-1]=='\n'
-          )
+                pConnection->inBuf->data[pConnection->inBuf->intLen-2]=='\r' && pConnection->inBuf->data[pConnection->inBuf->intLen-1]=='\n' )
         {
             //接收到完整握手
             printf("recv handshake, fd=%d\n", pConnection->intFd);
@@ -261,7 +286,10 @@ void WebsocketServer::parseMessage( SocketConnection *pConnection )
     pConnection->inBuf->intLen = 0;
     pConnection->inBuf->intExpectLen = 0;
 
-    ev_io_start(pMainLoop, pConnection->writeWatcher);
+    ev_io_start( pMainLoop, pConnection->writeWatcher );
+
+    ev_timer_set( pConnection->writeTimer, pConnection->writeTimeout, 0.0 );
+    ev_timer_start( pMainLoop, pConnection->writeTimer );
 }
 
 void WebsocketServer::closeConnection( SocketConnection *pConnection )
@@ -274,6 +302,9 @@ void WebsocketServer::closeConnection( SocketConnection *pConnection )
 
     pConnection->status = csClosing;
     ev_io_start(pMainLoop, pConnection->writeWatcher);
+
+    ev_timer_set( pConnection->writeTimer, pConnection->writeTimeout, 0.0 );
+    ev_timer_start( pMainLoop, pConnection->writeTimer );
 }
 
 void WebsocketServer::recvMessage( SocketConnection *pConnection )
@@ -397,6 +428,8 @@ void WebsocketServer::acceptCB()
     ev_init( pConnection->readTimer, readTimeoutCallback );
     ev_timer_set( pConnection->readTimer, pConnection->readTimeout, 0.0 );
     ev_timer_start( pMainLoop, pConnection->readTimer );
+
+    ev_init( pConnection->writeTimer, writeTimeoutCallback );
 }
 
 static void acceptCallback( EV_P_ ev_io *watcher, int revents )

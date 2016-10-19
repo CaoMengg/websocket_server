@@ -48,6 +48,7 @@ class WebsocketServer
         void readCB( int intFd );
         void writeCB( int intFd );
         void readTimeoutCB( int intFd );
+        void writeTimeoutCB( int intFd );
         void recvHandshake( SocketConnection *pConnection );
         void recvMessage( SocketConnection *pConnection );
         void parseHandshake( SocketConnection *pConnection );

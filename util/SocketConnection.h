@@ -30,6 +30,8 @@ class SocketConnection
             writeWatcher = new ev_io();
             readTimer = new ev_timer();
             readTimer->data = this;
+            writeTimer = new ev_timer();
+            writeTimer->data = this;
         }
         ~SocketConnection() {
             if( readWatcher && pLoop ) {
@@ -62,7 +64,9 @@ class SocketConnection
         ev_io *readWatcher = NULL;
         ev_io *writeWatcher = NULL;
         ev_timer *readTimer = NULL;
-        ev_tstamp readTimeout = 2.0;
+        ev_tstamp readTimeout = 3.0;
+        ev_timer *writeTimer = NULL;
+        ev_tstamp writeTimeout = 3.0;
 
         SocketBuffer *inBuf = NULL;
         bufferList outBufList;
