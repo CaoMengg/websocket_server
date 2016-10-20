@@ -14,6 +14,7 @@
 #include <openssl/pem.h>
 
 #include <map>
+#include <YamlConf.h>
 #include <SocketConnection.h>
 
 typedef std::map<int, SocketConnection*> connectionMap;
@@ -22,10 +23,14 @@ typedef std::pair<int, SocketConnection*> connectionPair;
 class WebsocketServer
 {
     private:
-        WebsocketServer() : intThreadId( 0 ), pMainLoop( EV_DEFAULT ), intListenPort( 8088 ), intListenFd( 0 ) {
+        WebsocketServer()
+        {
+            config = new YamlConf( "conf/wserver.yaml" );
+            intListenPort = config->getInt( "listen" );
             listenWatcher = new ev_io();
         }
-        ~WebsocketServer() {
+        ~WebsocketServer()
+        {
             if( listenWatcher ) {
                 ev_io_stop(pMainLoop, listenWatcher);
                 delete listenWatcher;
@@ -33,10 +38,11 @@ class WebsocketServer
         }
         static WebsocketServer *pInstance;
 
-        pthread_t intThreadId;
+        YamlConf *config = NULL;
+        pthread_t intThreadId = 0;
         struct ev_loop *pMainLoop = EV_DEFAULT;
-        int intListenPort;
-        int intListenFd;
+        int intListenPort = 0;
+        int intListenFd = 0;
         ev_io *listenWatcher = NULL;
         connectionMap mapConnection;
     public:

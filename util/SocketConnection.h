@@ -2,13 +2,12 @@
 #define SOCKETCONNECTION_H
 
 #include <stdio.h>
+#include <string>
+#include <list>
 #include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
 #include <ev.h>
-
-#include <list>
-#include <SocketBuffer.h>
+#include "SocketBuffer.h"
 
 typedef std::list<SocketBuffer *> bufferList;
 
