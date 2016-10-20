@@ -41,7 +41,7 @@ void WebsocketServer::readTimeoutCB( int intFd )
         return;
     }
     SocketConnection* pConnection = it->second;
-    printf("read time out, fd=%d\n", intFd);
+    printf("read timeout, fd=%d\n", intFd);
     delete pConnection;
 }
 
@@ -61,7 +61,7 @@ void WebsocketServer::writeTimeoutCB( int intFd )
         return;
     }
     SocketConnection* pConnection = it->second;
-    printf("write time out, fd=%d\n", intFd);
+    printf("write timeout, fd=%d\n", intFd);
     delete pConnection;
 }
 

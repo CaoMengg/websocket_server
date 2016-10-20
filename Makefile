@@ -15,11 +15,16 @@ util/SocketConnection.o: util/SocketConnection.cpp util/SocketConnection.h
 WebsocketServer.o: WebsocketServer.cpp WebsocketServer.h util/SocketConnection.o util/SocketBuffer.o
 	$(CXX) $(CFLAGS) -c $< $(INCLUDE) $(DEPENDS) -o $@
 
-.PHONY: clean
+.PHONY: clean run
 clean:
 	-$(RM) util/*.o util/*.gch
 	-$(RM) bin/wserver *.o *.gch
 	-$(RM) -rf run/supervise
 
-run:
-	./bin/server
+start:
+	-make stop
+	./bin/supervise.wserver run/ &
+
+stop:
+	-killall supervise.wserver
+	-killall wserver

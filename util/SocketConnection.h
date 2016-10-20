@@ -43,6 +43,15 @@ class SocketConnection
                 delete writeWatcher;
             }
 
+            if( readTimer && pLoop ) {
+                ev_timer_stop( pLoop, readTimer );
+                delete readTimer;
+            }
+            if( writeTimer && pLoop ) {
+                ev_timer_stop( pLoop, writeTimer );
+                delete writeTimer;
+            }
+
             if( intFd ) {
                 close( intFd );
             }
