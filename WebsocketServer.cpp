@@ -467,7 +467,7 @@ void WebsocketServer::run()
         printf("listen fail\n");
         return;
     }
-    printf("listen succ port=%d fd=%d\n", intListenPort, intListenFd);
+    LOG(INFO) << "server start, listen succ port=" << intListenPort << " fd=" << intListenFd;
 
     ev_io_init( listenWatcher, acceptCallback, intListenFd, EV_READ );
     ev_io_start( pMainLoop, listenWatcher );

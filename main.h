@@ -1,6 +1,7 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-#include <WebsocketServer.h>
+#include "GLog.h"
+#include "WebsocketServer.h"
 
 #endif
