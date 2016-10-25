@@ -32,9 +32,15 @@ class WebsocketServer
         }
         ~WebsocketServer()
         {
-            if( listenWatcher ) {
+            if( listenWatcher )
+            {
                 ev_io_stop(pMainLoop, listenWatcher);
                 delete listenWatcher;
+            }
+
+            if( intListenFd )
+            {
+                close( intListenFd );
             }
         }
         static WebsocketServer *pInstance;

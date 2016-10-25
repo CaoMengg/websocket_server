@@ -63,8 +63,6 @@ class SocketConnection
                 delete outBufList.front();
                 outBufList.pop_front();
             }
-
-            printf("delete connection, fd=%d\n", intFd);
         }
         struct ev_loop *pLoop = NULL;
         int intFd = 0;

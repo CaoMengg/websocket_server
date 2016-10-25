@@ -1,4 +1,4 @@
-#include <WebsocketServer.h>
+#include "WebsocketServer.h"
 
 WebsocketServer* WebsocketServer::pInstance = NULL;
 
@@ -41,7 +41,7 @@ void WebsocketServer::readTimeoutCB( int intFd )
         return;
     }
     SocketConnection* pConnection = it->second;
-    printf("read timeout, fd=%d\n", intFd);
+    LOG(WARNING) << "read timeout, fd=" << intFd;
     delete pConnection;
 }
 
@@ -61,7 +61,7 @@ void WebsocketServer::writeTimeoutCB( int intFd )
         return;
     }
     SocketConnection* pConnection = it->second;
-    printf("write timeout, fd=%d\n", intFd);
+    LOG(WARNING) << "write timeout, fd=" << intFd;
     delete pConnection;
 }
 
@@ -99,7 +99,7 @@ void WebsocketServer::ackHandshake( SocketConnection *pConnection )
 
     if( outBuf->intSentLen >= outBuf->intLen )
     {
-        printf("handshake succ, fd=%d\n", pConnection->intFd);
+        LOG(INFO) << "handshake succ, fd=" << pConnection->intFd;
 
         pConnection->outBufList.pop_front();
         delete outBuf;
@@ -140,11 +140,11 @@ void WebsocketServer::ackMessage( SocketConnection *pConnection )
 
             if( pConnection->status == csClosing )
             {
-                printf("close succ, fd=%d\n", pConnection->intFd);
+                LOG(INFO) << "close succ, fd=" << pConnection->intFd;
                 delete pConnection;
                 return;
             } else {
-                printf("ack message succ, fd=%d\n", pConnection->intFd);
+                LOG(INFO) << "ack message succ, fd=" << pConnection->intFd;
             }
         }
     }
@@ -155,7 +155,6 @@ void WebsocketServer::ackMessage( SocketConnection *pConnection )
 
 void WebsocketServer::writeCB( int intFd )
 {
-    //printf("write\n");
     connectionMap::iterator it;
     it = mapConnection.find( intFd );
     if( it == mapConnection.end() )
@@ -226,7 +225,7 @@ void WebsocketServer::recvHandshake( SocketConnection *pConnection )
                 pConnection->inBuf->data[pConnection->inBuf->intLen-2]=='\r' && pConnection->inBuf->data[pConnection->inBuf->intLen-1]=='\n' )
         {
             //接收到完整握手
-            printf("recv handshake, fd=%d\n", pConnection->intFd);
+            LOG(INFO) << "recv handshake, fd=" << pConnection->intFd;
             ev_timer_stop( pMainLoop, pConnection->readTimer );
             parseHandshake( pConnection );
         }
@@ -323,7 +322,7 @@ void WebsocketServer::recvMessage( SocketConnection *pConnection )
                     intPayloadLen = (unsigned char)(pConnection->inBuf->data[3]) | (unsigned char)(pConnection->inBuf->data[2]) << 8;
                 } else if( intPayloadLen == 127 )
                 {
-                    printf("unsupported payload len, close\n");
+                    LOG(WARNING) << "unsupported payload len, close";
                     ev_io_stop(pMainLoop, pConnection->readWatcher);
                     closeConnection( pConnection );
                     return;
@@ -336,7 +335,7 @@ void WebsocketServer::recvMessage( SocketConnection *pConnection )
                 closeConnection( pConnection );
                 return;
             } else {
-                printf("unsupported message, close\n");
+                LOG(WARNING) << "unsupported message, close";
                 ev_io_stop(pMainLoop, pConnection->readWatcher);
                 closeConnection( pConnection );
                 return;
@@ -351,7 +350,7 @@ void WebsocketServer::recvMessage( SocketConnection *pConnection )
         if( pConnection->inBuf->intLen >= pConnection->inBuf->intExpectLen )
         {
             //接收到完整frame
-            printf("recv message, fd=%d\n", pConnection->intFd);
+            LOG(INFO) << "recv message, fd=" << pConnection->intFd;
             ev_timer_stop( pMainLoop, pConnection->readTimer );
             parseMessage( pConnection );
         }
@@ -372,7 +371,6 @@ void WebsocketServer::recvMessage( SocketConnection *pConnection )
 
 void WebsocketServer::readCB( int intFd )
 {
-    //printf("read\n");
     connectionMap::iterator it;
     it = mapConnection.find( intFd );
     if( it == mapConnection.end() )
@@ -414,7 +412,7 @@ void WebsocketServer::acceptCB()
     }
     int flag = fcntl(acceptFd, F_GETFL, 0);
     fcntl(acceptFd, F_SETFL, flag | O_NONBLOCK);
-    printf("accept fd=%d\n", acceptFd);
+    LOG(INFO) << "accept fd=" << acceptFd;
 
     SocketConnection* pConnection = new SocketConnection();
     pConnection->pLoop = pMainLoop;
@@ -457,14 +455,14 @@ void WebsocketServer::run()
     intRet = bind( intListenFd, (struct sockaddr*)&sin, sizeof(sin) );
     if( intRet != 0 )
     {
-        printf("bind fail\n");
+        LOG(WARNING) << "bind fail";
         return;
     }
 
     intRet = listen( intListenFd, 255 );
     if( intRet != 0 )
     {
-        printf("listen fail\n");
+        LOG(WARNING) << "listen fail";
         return;
     }
     LOG(INFO) << "server start, listen succ port=" << intListenPort << " fd=" << intListenFd;
@@ -491,10 +489,10 @@ int WebsocketServer::start()
 
     if( intRet == 0 )
     {
-        printf( "start thread succ\n" );
+        LOG(INFO) << "start thread succ";
         return 0;
     } else {
-        printf( "start thread fail\n" );
+        LOG(WARNING) << "start thread fail";
         return 1;
     }
 }
