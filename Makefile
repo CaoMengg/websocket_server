@@ -30,6 +30,7 @@ clean:
 
 start:
 	-make stop
+	-make
 	./bin/supervise.wserver run/ &
 
 stop:
